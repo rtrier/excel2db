@@ -1,4 +1,4 @@
-package de.gdiservice.poi.test;
+package de.gdiservice.excel2db;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -8,7 +8,7 @@ import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
 
-import de.gdiservice.poi.test.Excel2DB.ColumnDescriptor;
+import de.gdiservice.excel2db.Excel2DB.ColumnDescriptor;
 import de.logosib.db.ConnectionFactory;
 
 public class RowWriter {

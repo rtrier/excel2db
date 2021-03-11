@@ -15,7 +15,7 @@
    limitations under the License.
 ==================================================================== */
 
-package de.gdiservice.poi.test;
+package de.gdiservice.excel2db;
 
 import java.io.File;
 import java.io.IOException;
@@ -48,7 +48,7 @@ import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.XMLReader;
 
-import de.gdiservice.poi.test.Excel2DB.ArgList;
+import de.gdiservice.excel2db.Excel2DB.ArgList;
 import de.logosib.db.ConnectionFactory;
 
 /**

@@ -1,4 +1,4 @@
-package de.gdiservice.poi.test;
+package de.gdiservice.excel2db;
 
 import java.io.File;
 import java.io.FileInputStream;
