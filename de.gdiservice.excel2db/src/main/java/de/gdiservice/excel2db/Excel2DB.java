@@ -13,6 +13,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.LogManager;
 
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.openxml4j.exceptions.NotOfficeXmlFileException;
@@ -30,7 +32,7 @@ import de.logosib.db.ConnectionFactory;
 
 public class Excel2DB {
 
-
+    private static final de.logosib.funclib.logger.Logger logger = de.logosib.funclib.logger.LoggerFactory.getLoggerFactory().getLogger(Excel2DB.class);
 	
 	private String schema; 
 
@@ -111,106 +113,6 @@ public class Excel2DB {
 		return cellsWithData==0;
 	}
 	
-	
-/*	
-
-	public void run() throws IOException, SQLException {
-		
-		
-		_ConnectionFactory = ConnectionFactory.getConnectionFactory();
-		Workbook workbook = read2(fileToRead);
-		// List<String> columnNames = getWorkbookColumns(workbook);
-
-
-//		for (int wbNr=0; wbNr<workbook.getNumberOfSheets(); wbNr++) {
-//			System.out.println(workbook.getSheetName(wbNr));
-//			int[] validColumnOfSheet = validColumns[wbNr];
-//			String[] columnNamesOfSheet = columnNames[wbNr];
-//			Class[] columnTypesOfSheet = columnTypes[wbNr];	
-//
-//			for (int i=0, count=columnNamesOfSheet.length; i<count; i++) {
-//				System.out.println("\t"+validColumnOfSheet[i] + "  \""+ columnNamesOfSheet[i] + "\" "+"  \""+ columnTypesOfSheet[i] + "\"");
-//			}
-//
-//		}
-
-
-		Connection con = null;
-		try {
-			con = _ConnectionFactory.getConnection();
-
-			con.createStatement().execute(getSQLDropTable());
-			
-			con.createStatement().execute(getSQLCreateTable());
-			
-
-			PreparedStatement stmt = con.prepareStatement(getSQLInsert());
-			int sqlNr = 0;
-
-			for (int wbNr=0; wbNr<workbook.getNumberOfSheets(); wbNr++) {
-				Sheet sheet = workbook.getSheetAt(wbNr);
-				int maxRowNr = sheet.getLastRowNum();
-				int minRowNr = sheet.getFirstRowNum();
-				int firstEmptyRow = -1;
-				int[] validColumnOfSheet = validColumns[wbNr];
-				Class[] columnTypesOfSheet = columnTypes[wbNr];	
-				for (int rowNr=minRowNr; (rowNr<=maxRowNr+1) && (firstEmptyRow<0); rowNr++) {					
-					if (rowNr!=minRowNr) {
-						Row row = sheet.getRow(rowNr);
-						if (row!=null) {
-							if (isEmpty(row, rowNr, validColumns[wbNr])) {
-								firstEmptyRow=rowNr;
-								System.out.println("firstEmptyRow "+firstEmptyRow);						
-							}
-							else {
-								stmt.setObject(1, sqlNr++);
-								for (int i=0; i<validColumnOfSheet.length; i++) {
-									Cell cell = row.getCell(validColumnOfSheet[i]);
-									if (cell!=null) {
-										Object o;
-										try {
-											o = getCellValue(cell, columnTypesOfSheet[i]);
-										} catch (Exception e) {
-											throw new RuntimeException("sheet: "+workbook.getSheetName(wbNr)+"  row="+rowNr+" cell="+validColumnOfSheet[i], e);
-										}
-										if (o!=null) {
-											stmt.setObject(i+2, o);						
-										}
-										else {
-											stmt.setNull(i+2, Types.VARCHAR);	
-										}
-									}
-									else {
-										stmt.setNull(i+2, Types.VARCHAR);
-									}
-								}
-								stmt.addBatch();
-							}
-							
-						}
-					}					
-				}
-				stmt.executeBatch();
-
-
-			}
-
-
-		}
-		finally {
-			if (con!=null) {
-				try {
-					con.close();
-				} catch (SQLException e) {
-					e.printStackTrace();
-				}
-			}
-		}
-
-
-
-	}
-	*/
 	
 	private Object getCellValue(Cell cell, Class<?> clasz) {
 		// System.err.println(cell);
@@ -325,7 +227,7 @@ public class Excel2DB {
 	}
 
 	public List<SheetDescriptor> analyse(Workbook workbook) {
-		System.out.println("analyse");
+		System.out.println("analyse workbook");
 		List<SheetDescriptor> sheetDescriptors = new ArrayList<>();
 		
 		for (int sheetNr=0; sheetNr<workbook.getNumberOfSheets(); sheetNr++) {
@@ -414,43 +316,7 @@ public class Excel2DB {
 		return c1;
 	}
 	
-	/*
-	public List<String> getWorkbookColumns(Workbook workbook) {
-
-		Sheet sheet = workbook.getSheetAt(0);
-
-		int minRowNr = sheet.getFirstRowNum();
-		int maxRowNr = sheet.getLastRowNum();
-
-		int minColNr = Integer.MAX_VALUE;
-		int maxColNr = Integer.MIN_VALUE;
-
-		for (int rowNr=minRowNr; rowNr<=maxRowNr+1; rowNr++) {
-			Row row = sheet.getRow(rowNr);
-			if (row==null) {
-				System.out.println("emptyRow="+rowNr);
-			}
-			else {
-				minColNr = Math.min(minColNr, row.getFirstCellNum());
-				maxColNr = Math.max(maxColNr, row.getLastCellNum());
-			}
-		} 
-		System.out.println("\t rowNrs "+minRowNr +" - "+maxRowNr+" columns = "+minColNr +" - "+maxColNr);
-		Row row = sheet.getRow(minRowNr);
-		List<String> columnNames = new ArrayList<>();
-		for (int i=minColNr; i<=maxColNr; i++) {
-			Cell cell = row.getCell(i);
-			if (cell==null) {
-				System.out.println("cell "+i+" is null");
-			}
-			else {
-				columnNames.add(cell.toString());
-			}
-		}
-		return columnNames;
-
-	}
-	*/
+	
 
 	public void read(File fileToRead) throws Exception {
 		
@@ -490,7 +356,9 @@ public class Excel2DB {
 				}
 			}
 			
-			for (SheetGroup sg : sheetGroups) {
+			for (int i=0; i<sheetGroups.size(); i++) {
+			    SheetGroup sg = sheetGroups.get(i);
+			    System.out.println("Gruppe " + i);
 				print(sg);
 			}
 			
@@ -500,12 +368,24 @@ public class Excel2DB {
 			System.out.println("File \""+filename+"\" not a excel file.");
 			ex.printStackTrace();
 		}
+		catch (Exception ex) {
+		    System.out.println("Error processing File: [\"" + ex.getMessage() + "\"]");
+		    ex.printStackTrace();
+        }
 		finally {
 			if (workbook!=null) {
-				workbook.close();
+				try {
+				    workbook.close();
+				} catch (Exception ex) {
+				    // System.out.println("Error closing workbook: [\"" + ex.getMessage() + "\"]");
+                }
 			}
 			if (pkg!=null) {
-				pkg.close();
+			    try {
+			        pkg.close();
+                } catch (Exception ex) {
+                    // System.out.println("Error closing workbook: [\"" + ex.getMessage() + "\"]");
+                }
 			}
 		}
 	}
@@ -562,22 +442,20 @@ public class Excel2DB {
 				sg.checkDoubleColumns();
 				
 				// String cTableName = schema+"."+ ((count==1) ? tablename : tablename+"_"+sgNr);				
-				String cTableName = schema+"."+ ((count==1) ? tablename : sg.sheetDescriptors.get(0).sheetName);								
-				con.createStatement().execute(getSQLDropTable(cTableName));
+				String cTableName = schema+".\""+ ((count==1) ? tablename : sg.sheetDescriptors.get(0).sheetName) +"\"";	
+				String sqlDropTable = getSQLDropTable(cTableName);
+				// System.out.println("running \"" + sqlDropTable + "\"");
+				con.createStatement().execute(sqlDropTable);
 				
 				
-				
-				
-				
-				System.out.println("writing table \""+tablename+"\"");
-				
-				
-				
-				
-				con.createStatement().execute(getSQLCreateTable(cTableName, sg.columnDescriptors));
+				System.out.println("writing table \""+cTableName+"\"");				
+				String sqlCreateTable = getSQLCreateTable(cTableName, sg.columnDescriptors);
+				// System.out.println("running \"" + sqlCreateTable + "\"");
+				con.createStatement().execute(sqlCreateTable);
 			
-
-				PreparedStatement stmt = con.prepareStatement(getSQLInsert(cTableName, sg.columnDescriptors));
+				String sqlInsert = getSQLInsert(cTableName, sg.columnDescriptors);
+				// System.out.println("running \"" + sqlInsert + "\"");
+				PreparedStatement stmt = con.prepareStatement(sqlInsert);
 				int sqlNr = 0;
 
 				for (SheetDescriptor sheetDescriptor : sg.sheetDescriptors) {
@@ -667,11 +545,13 @@ public class Excel2DB {
 	}
 	
 	private void print(SheetGroup sg) {
-		System.out.print(sg.sheetDescriptors.get(0).sheetName);
+	    System.out.print("\tsheets: [");
+		System.out.print(sg.sheetDescriptors.get(0).sheetName);		
 		for (int i=1, count=sg.sheetDescriptors.size(); i<count; i++) {
 			System.out.print(", "+sg.sheetDescriptors.get(i).sheetName);
 		}
-		System.out.println("\n\tColumns: ");
+		System.out.println("]");
+		System.out.println("\tColumns: ");
 		List<ColumnDescriptor> columnDescriptors = sg.getColumns();
 		for (ColumnDescriptor c : columnDescriptors) {
 			System.out.print("\t\tNr=\""+c.nr+"\"");
@@ -741,57 +621,7 @@ public class Excel2DB {
 		return result;
 	}
 
-/*
-	public Workbook read2(File f) throws IOException {
-		
-		FileInputStream excelFile = new FileInputStream(f);
 
-		Workbook workbook = new XSSFWorkbook(excelFile);
-
-		validColumns = new int[workbook.getNumberOfSheets()][];
-		columnNames = new String[workbook.getNumberOfSheets()][];
-		columnTypes = new Class[workbook.getNumberOfSheets()][];
-
-		for (int i=0, count = workbook.getNumberOfSheets(); i<count; i++) {
-			Sheet sheet = workbook.getSheetAt(i);
-			// System.out.println("DataSheet "+i +"  \""+sheet.getSheetName()+"\"");
-
-			int minRowNr = sheet.getFirstRowNum();
-			int maxRowNr = sheet.getLastRowNum();
-			// System.out.println("\t rowNrs "+minRowNr +" - "+maxRowNr);
-			List<Integer> emptyRows = new ArrayList<Integer>();
-			int lastDataRow = 0;
-			int firstEmptyRow = -1;
-			for (int rowNr=minRowNr; (rowNr<=maxRowNr+1) && (firstEmptyRow<0); rowNr++) {
-				Row row = sheet.getRow(rowNr);
-				if (rowNr==minRowNr) {
-					validColumns[i] = getValidColumns(row);
-					columnNames[i] = getColumnNames(row, validColumns[i]);
-					// System.out.println(Arrays.toString(validColumns));
-				}
-				else {
-					if (isEmpty(row, rowNr, validColumns[i])) {
-						emptyRows.add(rowNr);
-						firstEmptyRow=rowNr;
-						// System.out.println("firstEmptyRow "+firstEmptyRow);					
-					}
-					else {
-						if (columnTypes[i]==null) {
-							columnTypes[i] = getColumnTypes(row, validColumns[i]);
-						}
-						lastDataRow = rowNr;
-						// deleteCells(row, rowNr, validColumns[validColumns.length-1]-1);
-					}
-				}
-			}
-
-
-		}
-
-		return workbook;
-	}
-
-*/
 
 
 
@@ -932,6 +762,18 @@ public class Excel2DB {
 		}
 	}
 	
+    static String normalize(String s) {
+        String result = s.replaceAll("\s", "_");
+        result = result.replace("ä", "ae");
+        result = result.replace("ü", "ue");
+        result = result.replace("ö", "oe");
+        result = result.replace("ß", "sz");
+        result = result.replace("Ä", "Ae");
+        result = result.replace("Ü", "Ue");
+        result = result.replace("Ö", "Oe");        
+        return result.replaceAll("[^\\w^\\d]", "");
+    }	
+	
 	static class SheetDescriptor {		
 		
 		final String sheetName;
@@ -939,8 +781,8 @@ public class Excel2DB {
 		int firstDataRow;
 		List<ColumnDescriptor> columnDescriptors = new ArrayList<>();
 		
-		public SheetDescriptor(int nrOfSheet, String sheetName) {
-			this.sheetName = sheetName;
+		public SheetDescriptor(int nrOfSheet, String sheetName) {		    
+			this.sheetName = normalize(sheetName);
 			this.nrOfSheet = nrOfSheet;
 		}
 
@@ -964,7 +806,7 @@ public class Excel2DB {
 
 
 		void add(SheetDescriptor sheetDescriptor) {
-			System.out.println(sheetDescriptor.sheetName);
+//			System.out.println(sheetDescriptor.sheetName);
 			if (!Excel2DB.equals(sheetDescriptor.columnDescriptors, columnDescriptors)) {				
 				List<ColumnDescriptor> n = unify(sheetDescriptor.columnDescriptors, columnDescriptors);				
 				if (n==null) {
@@ -1050,6 +892,8 @@ public class Excel2DB {
 
 
 	public static void main(String[] args) {
+	    LogManager.getLogManager().getLogger("").setLevel(Level.SEVERE);
+	    
 		try {
 			ArgList argList = new ArgList(args);
 			String schema = argList.get("schema");			
