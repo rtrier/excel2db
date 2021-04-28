@@ -45,6 +45,8 @@ public class Excel2DB {
 	private boolean bExcelError2Null;
 	
 	private boolean createSchemaIfNotExits;
+
+    private boolean test;
 	
 	
 	Excel2DB(String schema, String importId, boolean createSchemaIfNotExits) {
@@ -284,7 +286,11 @@ public class Excel2DB {
 					}					
 				}
 				if (colName!=null) {
-					sheetDescriptor.addColumn(new ColumnDescriptor(colNr, colName, type));
+				    if (colName.length()>0) {				
+				        sheetDescriptor.addColumn(new ColumnDescriptor(colNr, colName, type));
+				    } else if (type!=null) {
+				        sheetDescriptor.addColumn(new ColumnDescriptor(colNr, "col_"+colNr, type));
+				    }
 				}
 			}
 			
@@ -361,8 +367,11 @@ public class Excel2DB {
 			    System.out.println("Gruppe " + i);
 				print(sg);
 			}
-			
-			save(workbook, sheetGroups, tablename);
+			if (!this.test) {
+			    save(workbook, sheetGroups, tablename);
+			} else {
+			    print(workbook, sheetGroups, tablename);
+			}
 		}
 		catch (NotOfficeXmlFileException ex) {
 			System.out.println("File \""+filename+"\" not a excel file.");
@@ -425,6 +434,76 @@ public class Excel2DB {
 	}
 	
 	
+	private void print(Workbook workbook, List<SheetGroup> sheetGroups, String tablename) throws SQLException {
+	    try {
+
+            for (int sgNr=0, count=sheetGroups.size(); sgNr<count; sgNr++) {
+                
+                SheetGroup sg = sheetGroups.get(sgNr);
+                sg.checkDoubleColumns();
+                String cTableName = schema+".\""+ ((count==1) ? tablename : sg.sheetDescriptors.get(0).sheetName) +"\"";
+                String sqlCreateTable = getSQLCreateTable(cTableName, sg.columnDescriptors);
+                System.out.println(sqlCreateTable);
+                String sqlInsert = getSQLInsert(cTableName, sg.columnDescriptors);
+                System.out.println(sqlInsert);
+                
+                for (SheetDescriptor sheetDescriptor : sg.sheetDescriptors) {
+                    System.out.println("writing sheet \""+sheetDescriptor.sheetName+"\" into \""+cTableName+"\"");
+                    Sheet sheet = workbook.getSheetAt(sheetDescriptor.nrOfSheet);
+                    int maxRowNr = sheet.getLastRowNum();
+                    int minRowNr = sheet.getFirstRowNum();
+                    int firstEmptyRow = -1;
+                    
+                    for (int rowNr=sheetDescriptor.firstDataRow; (rowNr<=maxRowNr+1) && (firstEmptyRow<0); rowNr++) {                   
+                        if (rowNr!=minRowNr) {
+                            Row row = sheet.getRow(rowNr);
+                            if (row!=null) {
+                                if (isEmpty(row, rowNr, sg.columnDescriptors)) {
+                                    firstEmptyRow=rowNr;
+                                    // System.out.println("firstEmptyRow "+firstEmptyRow);                      
+                                }
+                                else {
+                                    // stmt.setObject(1, sqlNr++);
+                                    StringBuilder sb = new StringBuilder();
+                                    for (int colNr=0, colCount=sg.columnDescriptors.size(); colNr<colCount; colNr++) {
+                                        ColumnDescriptor cd = sg.columnDescriptors.get(colNr);
+                                        Cell cell = row.getCell(cd.nr);
+                                        if (colNr>0) {
+                                            sb.append(", ");
+                                        }
+                                        if (cell!=null) {
+                                            Object o;
+                                            try {
+                                                o = getCellValue(cell, cd.type);
+                                            } 
+                                            catch (Exception e) {
+                                                throw new RuntimeException("sheet: \""+workbook.getSheetName(sheetDescriptor.nrOfSheet)+"\" row="+rowNr+" cell="+cd.nr+
+                                                        " name=\""+cd.name+"\" cellValue=\""+cell.toString()+"\"", e);
+                                            }
+                                            if (o!=null) {
+                                                sb.append(o);                     
+                                            }
+                                            else {
+                                                sb.append("null"); 
+                                            }
+                                        }
+                                        else {
+                                            sb.append("null");
+                                        }
+                                    }
+                                    System.out.println(sb);
+                                }
+                            
+                            }
+                        }                   
+                    }                   
+                }                
+            }
+	    } catch (Exception ex) {
+	        ex.printStackTrace();
+	    }
+	}
+	
 	private void save(Workbook workbook, List<SheetGroup> sheetGroups, String tablename) throws SQLException {
 		Connection con = null;
 		try {
@@ -450,7 +529,7 @@ public class Excel2DB {
 				
 				System.out.println("writing table \""+cTableName+"\"");				
 				String sqlCreateTable = getSQLCreateTable(cTableName, sg.columnDescriptors);
-				// System.out.println("running \"" + sqlCreateTable + "\"");
+				System.out.println("running \"" + sqlCreateTable + "\"");
 				con.createStatement().execute(sqlCreateTable);
 			
 				String sqlInsert = getSQLInsert(cTableName, sg.columnDescriptors);
@@ -763,7 +842,7 @@ public class Excel2DB {
 	}
 	
     static String normalize(String s) {
-        String result = s.replaceAll("\s", "_");
+        String result = s.replaceAll("\\s", "_");
         result = result.replace("ä", "ae");
         result = result.replace("ü", "ue");
         result = result.replace("ö", "oe");
@@ -896,6 +975,7 @@ public class Excel2DB {
 	    
 		try {
 			ArgList argList = new ArgList(args);
+			String test = argList.get("test");   
 			String schema = argList.get("schema");			
 			String filename = argList.get("file");
 			String dirname = argList.get("dir");
@@ -911,11 +991,12 @@ public class Excel2DB {
 			if (createSchemaIfNotExits!=null) {
 				bCreateSchemaIfNotExits = Boolean.parseBoolean(createSchemaIfNotExits);				
 			}
-			if (schema==null || (filename==null && dirname==null)) {
+			if (!"true".equals(test) &&  (schema==null || (filename==null && dirname==null))) {
 				printVerwendung();
 			}
 			else {
 				Excel2DB poiTest = new Excel2DB(schema, importId, bCreateSchemaIfNotExits);
+				poiTest.setTest("true".equals(test));
 				poiTest.setExcelErrors2Null(bExcelError2Null);
 				// "C:\\Users\\Ralf\\ownCloud\\Austausch\\Anlage_2aa_Artdaten_MZB_STI.xlsx"
 				// args = new String[] {"C:\\Users\\Ralf\\ownCloud\\2018-07-06_Bio-DB\\4. Daten\\Vorgaben und Beispieldaten\\Importdaten-Beispiel_2019_02_13\\Anlage_2bb_Artdaten_MP_STI.xlsx"};
@@ -953,7 +1034,12 @@ public class Excel2DB {
 	}
 
 	
-	private void setExcelErrors2Null(boolean bExcelError2Null) {
+	private void setTest(boolean test) {
+        this.test = test;
+    }
+
+
+    private void setExcelErrors2Null(boolean bExcelError2Null) {
 		this.bExcelError2Null = bExcelError2Null;
 	}
 
