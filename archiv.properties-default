@@ -1,0 +1,6 @@
+dbfactoryclass=de.logosib.db.SimpleConnectionFactory
+splitData=false
+dburl=jdbc:postgresql://ip:5432/databasename
+dbdriverclass=org.postgresql.Driver
+dbusername=kvwmap
+dbpassword=secret-password
