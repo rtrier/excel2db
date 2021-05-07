@@ -6,6 +6,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.sql.Types;
@@ -48,6 +49,12 @@ public class Excel2DB {
 
     private boolean test;
 	
+    
+
+    private boolean stopOnValidationError;
+
+
+    private TableDescription tableDescription;
 	
 	Excel2DB(String schema, String importId, boolean createSchemaIfNotExits) {
 		// this.fileToRead = new File(file);
@@ -96,7 +103,7 @@ public class Excel2DB {
 		}
 	}
 
-	boolean isEmpty(Row row, int rowNr, List<ColumnDescriptor> columns) {
+	boolean isEmptyRow(Row row, List<ColumnDescriptor> columns) {
 		int cellsWithData = 0;
 		if (row!=null) {
 			for (ColumnDescriptor cd : columns) {
@@ -113,6 +120,17 @@ public class Excel2DB {
 		}
 		// System.out.println("isEmpty "+rowNr+"  "+(cellsWithData));
 		return cellsWithData==0;
+	}
+	
+	
+	private boolean isEmpty(Cell cell, Class<?> clasz) {
+	    try {
+	        Object o = getCellValue(cell, clasz);
+	        return o==null || o.toString().isBlank();
+	    } 
+        catch (Exception e) {
+            return true;
+        }
 	}
 	
 	
@@ -270,6 +288,7 @@ public class Excel2DB {
 			for (int colNr=minColNr; colNr<=maxColNr; colNr++) {
 				String colName = null;
 				Class<?> type = null;
+				// boolean hasEmptyValues = false;
 				for (int rowNr=minRowNr; rowNr<=maxRowNr; rowNr++) {
 					Row row = sheet.getRow(rowNr);
 					if (row!=null) {
@@ -281,7 +300,9 @@ public class Excel2DB {
 //							if (colName!=null && colName.startsWith("Einzugsgebiet") && cell!=null)  {
 //								System.out.println(rowNr+"  "+type+"  "+getType(cell)+"  \""+cell.toString()+"\"");
 //							}
-							type = preferedClass(type, getType(cell));							
+						    Class<?> cellType = getType(cell);
+						    // hasEmptyValues = hasEmptyValues || isEmpty(cell, cellType);
+							type = preferedClass(type, cellType);							
 						}
 					}					
 				}
@@ -350,6 +371,8 @@ public class Excel2DB {
 			System.out.println("Loaded:\""+filename+"\"");
 			List<SheetDescriptor> sheetDescriptors = analyse(workbook);
 			
+
+			
 			sheetGroups.add(new SheetGroup(sheetDescriptors.get(0)));
 			for (int i=1, count=sheetDescriptors.size(); i<count; i++) {
 				SheetDescriptor sd = sheetDescriptors.get(i);
@@ -362,6 +385,17 @@ public class Excel2DB {
 				}
 			}
 			
+            if (this.tableDescription!=null) {
+                boolean isValid = validate(workbook, sheetGroups);
+                if (!isValid) {
+                    System.out.println("Die Valisierung war nicht erfolgreich. Bitte beachten Sie die obigen Ausgaben");
+                    if (stopOnValidationError) {
+                        System.out.println("Import wird abgebrochen");
+                        System.exit(3);
+                    }
+                }
+            }			
+			
 			for (int i=0; i<sheetGroups.size(); i++) {
 			    SheetGroup sg = sheetGroups.get(i);
 			    System.out.println("Gruppe " + i);
@@ -370,7 +404,7 @@ public class Excel2DB {
 			if (!this.test) {
 			    save(workbook, sheetGroups, tablename);
 			} else {
-			    print(workbook, sheetGroups, tablename);
+			     // print(workbook, sheetGroups, tablename);
 			}
 		}
 		catch (NotOfficeXmlFileException ex) {
@@ -400,7 +434,37 @@ public class Excel2DB {
 	}
 	
 	
-	private void createSchemaIfNotExits(String schema) throws SQLException {
+	private boolean validate(Workbook workbook, SheetGroup sheetGroup) {
+	    boolean isValid = true;
+	    for (int i=0; i<sheetGroup.columnDescriptors.size(); i++) {            
+            ColumnDescriptor istDescr = sheetGroup.columnDescriptors.get(i);
+            ColumnDescription sollDescr = tableDescription.find(istDescr.name);
+            if (sollDescr == null) {
+                isValid = false;
+                // System.out.println("soll: "+sollDescr);
+                System.out.println("Zielspalte für Quellspalte \""+istDescr.name+"\" wurde nicht gefunden.");
+            }
+        }
+	    boolean checkNullConstraints = checkNullConstraint(workbook, sheetGroup);
+	    return isValid && checkNullConstraints;
+	}
+	
+	private boolean validate(Workbook workbook, List<SheetGroup> sheetGroups) {
+	    boolean isValid = true;
+	    System.out.println("validating mit Spalten:");	    
+	    for (ColumnDescription cd : tableDescription.columns) {
+	        System.out.println("\t"+cd.source_column_name+"=>"+cd.target_column_name+"  typ="+cd.data_type+" darfLeerSein="+ (cd.is_nullable? "ja":"nein"));
+	    }
+	    for (SheetGroup sg : sheetGroups) {
+	        System.out.println("validating SheetGroup");
+	        boolean isSheetgroupValid = validate(workbook, sg);
+	        isValid = isValid && isSheetgroupValid;
+	    }
+	    return isValid;
+    }
+
+
+    private void createSchemaIfNotExits(String schema) throws SQLException {
 		Connection con = null;
 		ResultSet rs = null;
 		try {
@@ -432,7 +496,54 @@ public class Excel2DB {
 		}
 		
 	}
-	
+    
+    
+//    private boolean checkNullConstraint(Workbook workbook, SheetGroup sg, int colNr) throws SQLException {
+//        
+//        
+//        return false;
+//    }
+//    
+    private boolean checkNullConstraint(Workbook workbook, SheetGroup sg) {
+        boolean isValid = true;
+
+        for (SheetDescriptor sheetDescriptor : sg.sheetDescriptors) {
+            Sheet sheet = workbook.getSheetAt(sheetDescriptor.nrOfSheet);
+            int maxRowNr = sheet.getLastRowNum();
+            int minRowNr = sheet.getFirstRowNum();
+            int firstEmptyRow = -1;
+
+            for (int rowNr=sheetDescriptor.firstDataRow; (rowNr<=maxRowNr+1) && (firstEmptyRow<0); rowNr++) {                   
+                if (rowNr!=minRowNr) {
+                    Row row = sheet.getRow(rowNr);
+                    if (row!=null) {
+                        if (isEmptyRow(row, sg.columnDescriptors)) {
+                            firstEmptyRow=rowNr;
+                        }
+                        else {
+                            // stmt.setObject(1, sqlNr++);
+                            
+                            for (int colNr=0, colCount=sg.columnDescriptors.size(); colNr<colCount; colNr++) {
+                                ColumnDescriptor cd = sg.columnDescriptors.get(colNr);
+                                ColumnDescription cdSoll = tableDescription.find(cd.name);
+                                if (cdSoll!=null && !cdSoll.is_nullable) {
+                                    Cell cell = row.getCell(cd.nr);
+                                    if (isEmpty(cell, cd.type)) {
+                                        isValid = false;
+                                        System.out.println("Arbeitsblatt \""+sheetDescriptor.sheetName+"\" kein Wert in Spalte=\""+cd.name+"\" Zeile="+(rowNr+1));
+                                    }
+                                }                                    
+                            }
+                            
+                        }
+                    }
+                }                   
+            }                   
+        }                
+
+        return isValid;
+    }    
+
 	
 	private void print(Workbook workbook, List<SheetGroup> sheetGroups, String tablename) throws SQLException {
 	    try {
@@ -458,7 +569,7 @@ public class Excel2DB {
                         if (rowNr!=minRowNr) {
                             Row row = sheet.getRow(rowNr);
                             if (row!=null) {
-                                if (isEmpty(row, rowNr, sg.columnDescriptors)) {
+                                if (isEmptyRow(row, sg.columnDescriptors)) {
                                     firstEmptyRow=rowNr;
                                     // System.out.println("firstEmptyRow "+firstEmptyRow);                      
                                 }
@@ -548,7 +659,7 @@ public class Excel2DB {
 						if (rowNr!=minRowNr) {
 							Row row = sheet.getRow(rowNr);
 							if (row!=null) {
-								if (isEmpty(row, rowNr, sg.columnDescriptors)) {
+								if (isEmptyRow(row, sg.columnDescriptors)) {
 									firstEmptyRow=rowNr;
 									// System.out.println("firstEmptyRow "+firstEmptyRow);						
 								}
@@ -792,18 +903,43 @@ public class Excel2DB {
 		}
 		return result;
 	}
+	
+	static class TableDescription {
+	    Map<String, ColumnDescription> m = new HashMap<>();
+	    List<ColumnDescription> columns = new ArrayList<>();
+	    
+	    void add(ColumnDescription columnDescription) {
+	        m.put(columnDescription.source_column_name.toLowerCase(), columnDescription);
+	        columns.add(columnDescription);
+	    }
+	    
+	    ColumnDescription find(String sourceColumnName) {
+	        return m.get(sourceColumnName.toLowerCase());
+	    }
+	    
+	}
 
 	static class ColumnDescriptor {
 		final int nr;
 		String name;
 		final Class<?> type;
+//		final boolean hasEmptyValues;
+		
 		
 		public ColumnDescriptor(int nr, String colName, Class<?> type) {
-			this.nr=nr;
-			// this.name=(colName!=null ? colName.toLowerCase() : null);
-			this.name=colName;
-			this.type=type;
-		}
+            this.nr=nr;
+            // this.name=(colName!=null ? colName.toLowerCase() : null);
+            this.name=colName==null ? null : colName.trim();
+            this.type=type;
+        }
+		
+//		public ColumnDescriptor(int nr, String colName, Class<?> type, boolean hasEmptyValues) {
+//			this.nr=nr;
+//			// this.name=(colName!=null ? colName.toLowerCase() : null);
+//			this.name=colName==null ? null : colName.trim();
+//			this.type=type;
+//			this.hasEmptyValues=hasEmptyValues;
+//		}
 
 		@Override
 		public int hashCode() {
@@ -839,6 +975,13 @@ public class Excel2DB {
 				return false;
 			return true;
 		}
+
+        @Override
+        public String toString() {
+            return "ColumnDescriptor [nr=" + nr + ", name=\"" + name + "\", type=" + type + "]";
+        }
+		
+		
 	}
 	
     static String normalize(String s) {
@@ -981,6 +1124,13 @@ public class Excel2DB {
 			String dirname = argList.get("dir");
 			String excelError2Null = argList.get("excelError2Null");
 			String importId = argList.get("importid");
+			
+			String importTableTypes = argList.get("importTableTypes");
+			String expectedTableType = argList.get("expectedTableType");
+			String sStopOnValidationError = argList.get("stopOnValidationError");
+			boolean stopOnValidationError = sStopOnValidationError==null ? true : Boolean.parseBoolean(sStopOnValidationError);
+			
+			
 			boolean bExcelError2Null = true;
 			if (excelError2Null!=null) {
 				bExcelError2Null = Boolean.parseBoolean(excelError2Null);				
@@ -994,8 +1144,18 @@ public class Excel2DB {
 			if (!"true".equals(test) &&  (schema==null || (filename==null && dirname==null))) {
 				printVerwendung();
 			}
-			else {
+			else if (expectedTableType!=null && importTableTypes==null) {
+			    System.out.println("Error: If you specify expectedTableType you have to specify importTableTypes.");
+            } else {
+			 
 				Excel2DB poiTest = new Excel2DB(schema, importId, bCreateSchemaIfNotExits);
+				try {
+				    poiTest.setValidationParam(importTableTypes, expectedTableType, stopOnValidationError);
+				}
+				catch (Exception ex) {
+				    System.err.println("Error by getting expectedTableType: "+ex.getLocalizedMessage());
+				    System.exit(1);
+				}
 				poiTest.setTest("true".equals(test));
 				poiTest.setExcelErrors2Null(bExcelError2Null);
 				// "C:\\Users\\Ralf\\ownCloud\\Austausch\\Anlage_2aa_Artdaten_MZB_STI.xlsx"
@@ -1032,9 +1192,89 @@ public class Excel2DB {
 			ex.printStackTrace();
 		}
 	}
+	
 
 	
-	private void setTest(boolean test) {
+	private void setValidationParam(String importTableTypes, String expectedTableType, boolean stopOnValidationError) throws Exception {	     
+	    this.stopOnValidationError = stopOnValidationError;
+	    if (importTableTypes!=null && expectedTableType!=null) {
+	        this.tableDescription = readType(importTableTypes, expectedTableType);
+	    }
+    }
+
+
+    private TableDescription readType(String importTableTypes, String expectedTableType) throws Exception {
+       Connection con = null;
+        Statement stmt = null;
+        ResultSet rs = null;
+        try {
+            con = ConnectionFactory.getConnectionFactory().getConnection();
+            stmt = con.createStatement();
+            
+            String sql = "SELECT source_column_name, target_column_name, data_type, is_nullable\r\n"
+                    + "    FROM " + importTableTypes
+                    + "    where table_type = '" + expectedTableType +"'";
+            rs = stmt.executeQuery(sql);
+            
+            final TableDescription tableDescription = new TableDescription();
+            while (rs.next()) {
+                final ColumnDescription colDesc = new ColumnDescription(rs);
+                tableDescription.add(colDesc);
+            }
+            if (tableDescription.columns.size()==0) {
+                throw new IllegalArgumentException("expectedTableType \""+expectedTableType+"\" not found in table \""+importTableTypes+"\".");
+            }   
+            return tableDescription;
+        }
+        finally {
+            if (rs!=null) {
+                try {
+                    rs.close();
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            }
+            if (stmt!=null) {
+                try {
+                    stmt.close();
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            }
+            if (con!=null) {
+                try {
+                    con.close();
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+    
+    
+    static class ColumnDescription {
+        String source_column_name;
+        String target_column_name;
+        String data_type;
+        boolean is_nullable;
+        
+        ColumnDescription(ResultSet rs) throws SQLException {
+            int i=1;
+            source_column_name= rs.getString(i++);
+            target_column_name = rs.getString(i++);
+            data_type = rs.getString(i++);
+            is_nullable = rs.getBoolean(i++);
+        }
+
+        @Override
+        public String toString() {
+            return "ColumnDescription [source_column_name=" + source_column_name + ", target_column_name="
+                    + target_column_name + ", data_type=" + data_type + ", is_nullable=" + is_nullable + "]";
+        }
+    }
+
+
+    private void setTest(boolean test) {
         this.test = test;
     }
 
@@ -1050,6 +1290,10 @@ public class Excel2DB {
 		System.out.println("\t[createSchemaIfNotExits=true|false] Standard=false");
 		System.out.println("\t[importid=id aus der der Schemaname gebildet wird]");
 		System.out.println("\t[excelError2Null=true|false Standard=true]");
+		System.out.println("to import with validation:");
+		System.out.println("\t[importTableTypes=DatabaseTableWithDescription columns=(table_type, source_column_name, target_column_name, data_type, is_nullable)");
+		System.out.println("\t[expectedTableType=type");
+		System.out.println("\t[stopOnValidationErrors=bool Standard=true");
 	}
 	
 	static class ArgList {
