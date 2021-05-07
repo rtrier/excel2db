@@ -388,6 +388,7 @@ public class Excel2DB {
 				}
 			}
 			
+			
             if (this.tableDescription!=null) {
                 boolean isValid = validate(workbook, sheetGroups);
                 if (!isValid) {
@@ -399,11 +400,7 @@ public class Excel2DB {
                 }
             }			
 			
-			for (int i=0; i<sheetGroups.size(); i++) {
-			    SheetGroup sg = sheetGroups.get(i);
-			    System.out.println("Gruppe " + i);
-				print(sg);
-			}
+			
 			if (!this.test) {
 			    save(workbook, sheetGroups, tablename);
 			} else {
@@ -466,7 +463,12 @@ public class Excel2DB {
 	    if (sheetGroups.size()==1) {
 	        return isValid;
 	    } else {
-	        System.out.println("die Strukturen der Tabellenblätter stimmen nciht überein.");
+	        System.out.println("die Strukturen der Tabellenblätter stimmen nicht überein.");
+	        for (int i=0; i<sheetGroups.size(); i++) {
+                SheetGroup sg = sheetGroups.get(i);
+                System.out.println("Gruppe " + i);
+                print(sg);
+            }
 	        return false;
 	    }
     }
