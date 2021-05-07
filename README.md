@@ -4,7 +4,12 @@ Imports Excel-Files into a Database.
 
 It imports all worksheets with the same structure into one table. If validation is enabled all worksheets have to have the same structure.
 
-The type of an column will be determined by evalutaion the Excel tables.
+The type of an column will be determined by evalutaion the Excel tables.<br>Possible types: 
+<br>&nbsp;&nbsp;&nbsp;&nbsp;String => varchar
+<br>&nbsp;&nbsp;&nbsp;&nbsp;Double => float
+<br>&nbsp;&nbsp;&nbsp;&nbsp;Boolean => boolean
+<br>&nbsp;&nbsp;&nbsp;&nbsp;java.util.Date => timestamp
+<br>&nbsp;&nbsp;&nbsp;&nbsp;java.sql.Time => time
 
 Main-Class is Excel2DB. If the Excel file doesnt fit into memory Excel2DBSeq can be used. Then all column types are strings.
 
@@ -22,3 +27,11 @@ to import with validation:<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;columns=(table_type, source_column_name, target_column_name, data_type, is_nullable)
 <br>&nbsp;&nbsp;&nbsp;&nbsp;expectedTableType=value of table_type from above table
 <br>&nbsp;&nbsp;&nbsp;&nbsp;stopOnValidationErrors=bool Standard=true
+
+
+__Use (Docker):__<br>
+download Dockerfile<br>
+download archiv.properties-default to archiv.properties<br>
+adjust archiv.properties<br>
+docker build -t excel2db:latest .<br>
+docker run --rm -v dirWithExcelFile:/exceldata/ excel2db:latest -schema=import_schema -file=excelFile [-params1=...]
