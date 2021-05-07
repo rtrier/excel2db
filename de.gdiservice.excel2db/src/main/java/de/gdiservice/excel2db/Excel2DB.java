@@ -440,7 +440,7 @@ public class Excel2DB {
             ColumnDescriptor istDescr = sheetGroup.columnDescriptors.get(i);
             ColumnDescription sollDescr = tableDescription.find(istDescr.name);
             if (sollDescr == null) {
-                isValid = false;
+                // isValid = false;
                 // System.out.println("soll: "+sollDescr);
                 System.out.println("Zielspalte für Quellspalte \""+istDescr.name+"\" wurde nicht gefunden.");
             }
@@ -460,7 +460,12 @@ public class Excel2DB {
 	        boolean isSheetgroupValid = validate(workbook, sg);
 	        isValid = isValid && isSheetgroupValid;
 	    }
-	    return isValid;
+	    if (sheetGroups.size()==1) {
+	        return isValid;
+	    } else {
+	        System.out.println("die Strukturen der Tabellenblätter stimmen nciht überein.");
+	        return false;
+	    }
     }
 
 
