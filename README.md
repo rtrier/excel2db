@@ -2,10 +2,14 @@
 
 Imports Excel-Files into a Database.
 
-to use it, a file archiv.properties has to be in the classpath. As an example use [ archiv.properties-default](https://raw.githubusercontent.com/rtrier/excel2db/master/archiv.properties-default). 
-If you want to access not a postgresql database you have to put the jdbc driver in the classpath.
-
 It imports all worksheets with the same structure into one table. If validation is enabled all worksheets have to have the same structure.
+
+The type of an column will be determined by evalutaion the Excel tables.
+
+Main-Class is Excel2DB. If the Excel file doesnt fit into memory Excel2DBSeq can be used. Then all column types are strings.
+
+To use it, a file archiv.properties has to be in the classpath. As an example use [ archiv.properties-default](https://raw.githubusercontent.com/rtrier/excel2db/master/archiv.properties-default). 
+If you want to access not a postgresql database you have to put the jdbc driver in the classpath.
 
 __Parmeters:__
 
