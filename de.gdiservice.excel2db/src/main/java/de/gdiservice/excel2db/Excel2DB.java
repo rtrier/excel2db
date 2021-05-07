@@ -125,6 +125,9 @@ public class Excel2DB {
 	
 	private boolean isEmpty(Cell cell, Class<?> clasz) {
 	    try {
+	        if (cell.getCellType()==CellType.BLANK) {
+	            return true;
+	        }
 	        Object o = getCellValue(cell, clasz);
 	        return o==null || o.toString().isBlank();
 	    } 
@@ -537,6 +540,9 @@ public class Excel2DB {
                                         isValid = false;
                                         System.out.println("Arbeitsblatt \""+sheetDescriptor.sheetName+"\" kein Wert in Spalte=\""+cd.name+"\" Zeile="+(rowNr+1));
                                     }
+                                    
+                                        
+                                        
                                 }                                    
                             }
                             
