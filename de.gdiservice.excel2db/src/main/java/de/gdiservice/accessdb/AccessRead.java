@@ -356,15 +356,7 @@ public class AccessRead {
             if (datei==null) { 
                 printVerwendung("datei");
             }
-            
 
-            //                host = "mvbio.de";
-            //                port = "5432";
-            //                database = "kvwmapsp";
-            //                user = "kvwmap";
-            //                password = "RemaZuki_2";
-            //                targetSchema = "rtr_testimport";
-            //                datei = "C:\\Users\\Ralf\\Nextcloud\\Austausch\\rtr\\mvb998.mdb";
 
             Properties dbProps = new Properties();
             dbProps.put("user", user);
