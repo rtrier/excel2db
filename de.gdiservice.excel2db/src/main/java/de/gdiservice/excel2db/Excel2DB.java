@@ -129,7 +129,7 @@ public class Excel2DB {
 	            return true;
 	        }
 	        Object o = getCellValue(cell, clasz);
-	        return o==null || o.toString().isBlank();
+	        return o==null || o.toString().length()==0;
 	    } 
         catch (Exception e) {
             return true;
@@ -1309,25 +1309,6 @@ public class Excel2DB {
 		System.out.println("\t[stopOnValidationErrors=bool Standard=true");
 	}
 	
-	static class ArgList {
-		
-		Map<String, String> argMap = new HashMap<>();
-		
-		ArgList(String[] args) {
-			if (args!=null) {
-				for (int i=0; i<args.length; i++) {
-					String[] sA = args[i].split("=");
-					if (sA.length==2) {
-						argMap.put(sA[0], sA[1]);
-					}
-				}
-			}
-		}
-		
-		String get(String argName) {
-			return argMap.get(argName);
-		}
-		
-	}
+
 
 }
