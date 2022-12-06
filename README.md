@@ -28,6 +28,19 @@ to import with validation:<br>
 <br>&nbsp;&nbsp;&nbsp;&nbsp;expectedTableType=value of table_type from above table
 <br>&nbsp;&nbsp;&nbsp;&nbsp;stopOnValidationErrors=bool Standard=true
 
+# access2db
+
+Imports all table from access db into postgres
+
+__Parmeters:__
+&nbsp;&nbsp;&nbsp;&nbsp;host=myhost<br>
+&nbsp;&nbsp;&nbsp;&nbsp;port=123<br>
+&nbsp;&nbsp;&nbsp;&nbsp;database=mydb<br>
+&nbsp;&nbsp;&nbsp;&nbsp;user=username<br>
+&nbsp;&nbsp;&nbsp;&nbsp;password=password<br>
+&nbsp;&nbsp;&nbsp;&nbsp;zielschema=targetschema<br>
+&nbsp;&nbsp;&nbsp;&nbsp;datei=accesFile<br>
+<br>
 
 __Use (Docker):__<br>
 download Dockerfile<br>
